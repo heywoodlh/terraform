@@ -25,3 +25,11 @@ variable "k8s_min_nodes" {
 variable "k8s_server_size" {
   type = string
 }
+
+variable "k8s_block_storage_size" {
+  type = number
+}
+
+variable "k8s_block_storage_region" {
+  type = string
+}
