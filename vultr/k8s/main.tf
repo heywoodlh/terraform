@@ -38,25 +38,26 @@ resource "vultr_kubernetes" "k8s_cluster" {
 } 
 
 locals {
-  kubeconfig = yamldecode(base64decode(vultr_kubernetes.k8s_cluster.kube_config))
+  kubeconfig             = yamldecode(base64decode(vultr_kubernetes.k8s_cluster.kube_config))
   host                   = local.kubeconfig["clusters"][0]["cluster"]["server"]
-  ca_cert    = base64decode(local.kubeconfig["clusters"][0]["cluster"]["certificate-authority-data"])
+  ca_cert                = base64decode(local.kubeconfig["clusters"][0]["cluster"]["certificate-authority-data"])
   client_certificate     = base64decode(local.kubeconfig["users"][0]["user"]["client-certificate-data"])
   client_key             = base64decode(local.kubeconfig["users"][0]["user"]["client-key-data"])
-  token                  = local.kubeconfig["users"][0]["user"]["token"]
 }
 
 # Initialize kubernetes provider with k8s_cluster config
 provider "kubernetes" {
   host                   = local.host
-  token                  = local.token
   cluster_ca_certificate = local.ca_cert
+  client_certificate     = local.client_certificate
+  client_key             = local.client_key
 }
 
 provider "kubectl" {
   host                   = local.host
-  token                  = local.token
   cluster_ca_certificate = local.ca_cert
+  client_certificate     = local.client_certificate
+  client_key             = local.client_key
   load_config_file       = false
 }
 
@@ -74,9 +75,13 @@ resource "kubernetes_secret" "vultr_secret" {
 provider "http" {}
 
 ## kubectl apply -f https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml
-#data "http" "vultr_csi_yaml" {
-#  url  = "https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml"
-#}
-#resource "kubectl_manifest" "vultr_csi" {
-#  yaml_body = data.vultr_csi_yaml.body
-#}
+data "http" "vultr_csi_manifest_raw" {
+  url  = "https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml"
+}
+data "kubectl_file_documents" "vultr_csi_manifest" {
+  content = data.http.vultr_csi_manifest_raw.body
+}
+resource "kubectl_manifest" "vultr_csi" {
+  for_each  = data.kubectl_file_documents.vultr_csi_manifest.manifests
+  yaml_body = each.value
+}
