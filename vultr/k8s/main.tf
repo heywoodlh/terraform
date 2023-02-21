@@ -2,7 +2,15 @@ terraform {
   required_providers {
     vultr = {
       source = "vultr/vultr"
-      version = "2.12.0"
+      version = "2.12.1"
+    }
+    kubectl = {
+      source = "gavinbunney/kubectl"
+      version = "1.14.0"
+    }
+    http = {
+      source = "hashicorp/http"
+      version = "3.2.1"
     }
   }
 }
@@ -29,10 +37,39 @@ resource "vultr_kubernetes" "k8s_cluster" {
     }
 } 
 
-resource "vultr_block_storage" "k8s_block_storage" {
-    label = "${var.k8s_label}-blockstorage"
-    size_gb = "${var.k8s_block_storage_size}"
-    region = "${var.k8s_block_storage_region}"
-    # attach to node_pool
-    attached_to_instance = "${vultr_kubernetes.k8s_cluster.node_pools.0.id}"
+# Initialize kubernetes provider with k8s_cluster config
+provider "kubernetes" {
+  host                   = "${vultr_kubernetes.k8s_cluster.endpoint}"
+  token                  = "${vultr_kubernetes.k8s_cluster.kubeconfig.0.token}"
+  cluster_ca_certificate = "${base64decode(vultr_kubernetes.k8s_cluster.kubeconfig.0.cluster_ca_certificate)}"
+}
+
+# Initialize kubectl provider with k8s_cluster config
+provider "kubectl" {
+  host                   = "${vultr_kubernetes.k8s_cluster.endpoint}"
+  token                  = "${vultr_kubernetes.k8s_cluster.kubeconfig.0.token}"
+  cluster_ca_certificate = "${base64decode(vultr_kubernetes.k8s_cluster.kubeconfig.0.cluster_ca_certificate)}"
+  load_config_file       = false
+}
+
+# Create secret for persistent storage
+resource "kubernetes_secret" "vultr_secret" {
+  metadata {
+    name = "vultr-csi"
+  }
+  data = {
+    api-key = "${var.vultr_api_key}"
+  }
+  type = "Opaque"
+}
+
+provider "http" {}
+
+# kubectl apply -f https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml
+data "http_request" "manifest" {
+  url  = "https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml"
+}
+resource "kubectl_apply" "vultr_csi" {
+  depends_on = [http_request.manifest]
+  manifest = http_request.manifest.body
 }
