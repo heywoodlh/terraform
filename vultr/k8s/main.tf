@@ -37,22 +37,30 @@ resource "vultr_kubernetes" "k8s_cluster" {
     }
 } 
 
-# Initialize kubernetes provider with k8s_cluster config
-provider "kubernetes" {
-  host                   = "${vultr_kubernetes.k8s_cluster.endpoint}"
-  token                  = "${vultr_kubernetes.k8s_cluster.kubeconfig.0.token}"
-  cluster_ca_certificate = "${base64decode(vultr_kubernetes.k8s_cluster.kubeconfig.0.cluster_ca_certificate)}"
+locals {
+  kubeconfig = yamldecode(base64decode(vultr_kubernetes.k8s_cluster.kube_config))
+  host                   = local.kubeconfig["clusters"][0]["cluster"]["server"]
+  ca_cert    = base64decode(local.kubeconfig["clusters"][0]["cluster"]["certificate-authority-data"])
+  client_certificate     = base64decode(local.kubeconfig["users"][0]["user"]["client-certificate-data"])
+  client_key             = base64decode(local.kubeconfig["users"][0]["user"]["client-key-data"])
+  token                  = local.kubeconfig["users"][0]["user"]["token"]
 }
 
-# Initialize kubectl provider with k8s_cluster config
+# Initialize kubernetes provider with k8s_cluster config
+provider "kubernetes" {
+  host                   = local.host
+  token                  = local.token
+  cluster_ca_certificate = local.ca_cert
+}
+
 provider "kubectl" {
-  host                   = "${vultr_kubernetes.k8s_cluster.endpoint}"
-  token                  = "${vultr_kubernetes.k8s_cluster.kubeconfig.0.token}"
-  cluster_ca_certificate = "${base64decode(vultr_kubernetes.k8s_cluster.kubeconfig.0.cluster_ca_certificate)}"
+  host                   = local.host
+  token                  = local.token
+  cluster_ca_certificate = local.ca_cert
   load_config_file       = false
 }
 
-# Create secret for persistent storage
+## Create secret for persistent storage
 resource "kubernetes_secret" "vultr_secret" {
   metadata {
     name = "vultr-csi"
@@ -65,11 +73,10 @@ resource "kubernetes_secret" "vultr_secret" {
 
 provider "http" {}
 
-# kubectl apply -f https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml
-data "http_request" "manifest" {
-  url  = "https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml"
-}
-resource "kubectl_apply" "vultr_csi" {
-  depends_on = [http_request.manifest]
-  manifest = http_request.manifest.body
-}
+## kubectl apply -f https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml
+#data "http" "vultr_csi_yaml" {
+#  url  = "https://raw.githubusercontent.com/vultr/vultr-csi/master/docs/releases/latest.yml"
+#}
+#resource "kubectl_manifest" "vultr_csi" {
+#  yaml_body = data.vultr_csi_yaml.body
+#}

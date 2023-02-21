@@ -33,3 +33,7 @@ variable "k8s_block_storage_size" {
 variable "k8s_block_storage_region" {
   type = string
 }
+
+variable "vultr_api_key" {
+  type = string
+}
