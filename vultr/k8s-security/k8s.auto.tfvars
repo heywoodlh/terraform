@@ -7,3 +7,6 @@ k8s_min_nodes = 1
 k8s_server_size = "vc2-1c-2gb"
 k8s_block_storage_size = 10
 k8s_block_storage_region = "lax"
+k8s_domain = "heywoodlh.cloud" # will work when domain's NS are ns1.vultr.com and ns2.vultr.com
+app_of_apps_url = "https://github.com/heywoodlh/k8s-security"
+app_of_apps_version = "0.0.1-alpha"

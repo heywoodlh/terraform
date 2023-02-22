@@ -37,3 +37,15 @@ variable "k8s_block_storage_region" {
 variable "vultr_api_key" {
   type = string
 }
+
+variable "k8s_domain" {
+  type = string
+}
+
+variable "app_of_apps_url" {
+  type = string
+}
+
+variable "app_of_apps_version" {
+  type = string
+}
