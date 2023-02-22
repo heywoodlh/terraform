@@ -128,10 +128,17 @@ resource "helm_release" "argocd" {
   dependency_update = true
 }
 
+## Wait for Application CRD
+resource "time_sleep" "wait_60_seconds" {
+  create_duration = "60s"
+  depends_on = [helm_release.argocd]
+}
+
 ## Deploy the app of apps
 resource "helm_release" "app_of_apps" {
-  name = "bootstrap-app"
+  name  = "bootstrap-app"
   chart = "./app_of_apps/apps"
+  depends_on = [time_sleep.wait_60_seconds]
 }
 
 ## Remove local git repo
