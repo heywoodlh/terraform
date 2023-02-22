@@ -16,10 +16,6 @@ terraform {
       source = "hashicorp/helm"
       version = "2.9.0"
     }
-    argocd = {
-      source = "oboukili/argocd"
-      version = "4.3.0"
-    }
   }
 }
 
@@ -129,6 +125,7 @@ resource "helm_release" "argocd" {
   name = "argo-cd"
   namespace = "argocd"
   chart = "./app_of_apps/charts/argo-cd"
+  dependency_update = true
 }
 
 ## Deploy the app of apps
